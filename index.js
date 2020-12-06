@@ -1,8 +1,13 @@
 const express = require("express");
-const app = express();
 const mongoose = require("mongoose");
-const users = require("./app/users");
 const cors = require('cors');
+
+const app = express();
+require("express-ws")(app);
+
+const users = require("./app/users");
+const chat = require("./app/chat");
+
 const config = require("./config");
 const port = 8000;
 
@@ -17,6 +22,7 @@ const options = {
 const run = async () => {
     await mongoose.connect(config.db.url + "/" + config.db.name, options);
     app.use("/users", users);
+    app.use("/chat", chat);
     console.log("Connected");
     app.listen(port, () => {
         console.log(`Server started on ${port} port!`);
