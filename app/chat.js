@@ -1,7 +1,9 @@
 const router = require("express").Router();
 const Message = require('../models/Message')
 const User = require('../models/User');
+
 const activeConnections = {};
+const users = [];
 
 router.ws("/", async (ws, res) => {
     const id = res.query.token;
@@ -10,7 +12,19 @@ router.ws("/", async (ws, res) => {
     let query;
     query = {token: id}
     const newUser = await User.find(query);
-    const username = newUser[0].username
+    const username = newUser[0].username;
+    let name = users.find(user => user === username)
+    if (!name) {
+        users.push(username);
+    }
+
+    Object.keys(activeConnections).forEach(connId => {
+        const conn = activeConnections[connId];
+        conn.send(JSON.stringify({
+            type: "ALL_USERS",
+            usersList: users
+        }));
+    });
 
     ws.on("message", async msg => {
         const decodedMessage = JSON.parse(msg);
@@ -26,6 +40,7 @@ router.ws("/", async (ws, res) => {
                 } else {
                     ws.send(JSON.stringify({type: "ERROR"}));
                 }
+
                 break;
             case "CREATE_MESSAGE":
                 let messageData = {};
@@ -47,13 +62,27 @@ router.ws("/", async (ws, res) => {
                     }));
                 });
                 break;
+
+            case 'DISCONNECT':
+                let index = users.indexOf(username);
+                if (index > -1) {
+                    users.splice(index, 1);
+                    Object.keys(activeConnections).forEach(connId => {
+                        const conn = activeConnections[connId];
+                        conn.send(JSON.stringify({
+                            type: "ALL_USERS",
+                            usersList: users
+                        }));
+                    });
+                }
+                break;
             default:
                 console.log("Unknown message type:", decodedMessage.type);
         }
     });
 
     ws.on("close", msg => {
-        // console.log("Client disconnected! id =", id);
+        console.log("Client disconnected! id =", id);
         delete activeConnections[id];
     });
 });
